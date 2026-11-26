@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   initialRoutineData,
-  mealRulesData,
+  translations,
   generateTasksFromSchedule,
 } from "./data/defaultRoutineData";
 import ScheduleSetupForm from "./components/ScheduleSetupForm";
@@ -11,118 +11,92 @@ import MealGuideCard from "./components/MealGuideCard";
 import WeeklySummaryView from "./components/WeeklySummaryView";
 
 const STORAGE_KEY = "health_routine_planner_v1";
-const SLOT_ORDER = ["Morning", "Work Break", "Evening / Night"];
 
-function getTodayDateString() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function buildTodaySummary(tasks, dateStr) {
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.reduce(
-    (sum, task) => sum + (task.completed ? 1 : 0),
-    0
-  );
-  const completionPercent =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-  let missedSlot = "None";
-  let lowestRatio = 1;
-
-  SLOT_ORDER.forEach((slotName) => {
-    const slotTasks = tasks.filter((task) => task.slot === slotName);
-    if (slotTasks.length > 0) {
-      const slotCompleted = slotTasks.filter((task) => task.completed).length;
-      const ratio = slotCompleted / slotTasks.length;
-      if (ratio < 1 && ratio < lowestRatio) {
-        lowestRatio = ratio;
-        missedSlot = slotName;
-      }
-    }
-  });
-
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const parsedDate = new Date(`${dateStr}T00:00:00`);
-  const dayLabel = Number.isNaN(parsedDate.getTime())
-    ? "Today"
-    : dayNames[parsedDate.getDay()];
-
-  return {
-    day: dayLabel,
-    date: dateStr,
-    completionPercent,
-    missedSlot,
-  };
-}
-
-function upsertWeeklyHistory(history, todaySummary) {
-  const safeHistory = Array.isArray(history) ? history : [];
-  const exists = safeHistory.some((entry) => entry.date === todaySummary.date);
-  const updated = exists
-    ? safeHistory.map((entry) =>
-        entry.date === todaySummary.date ? { ...entry, ...todaySummary } : entry
-      )
-    : [...safeHistory, todaySummary];
-
-  return updated.slice(-7);
+function loadInitialState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return initialRoutineData;
+    const parsed = JSON.parse(raw);
+    return {
+      ...initialRoutineData,
+      ...parsed,
+      language: ["en", "gu", "hi"].includes(parsed?.language)
+        ? parsed.language
+        : "en",
+      schedule: {
+        ...initialRoutineData.schedule,
+        ...(parsed?.schedule || {}),
+      },
+      tasks: Array.isArray(parsed?.tasks) ? parsed.tasks : initialRoutineData.tasks,
+      weeklyHistory: Array.isArray(parsed?.weeklyHistory)
+        ? parsed.weeklyHistory
+        : initialRoutineData.weeklyHistory,
+    };
+  } catch {
+    return initialRoutineData;
+  }
 }
 
 export default function App() {
-  const [routineData, setRoutineData] = useState(() => {
+  const [appData, setAppData] = useState(loadInitialState);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  const lang = appData.language || "en";
+  const t = translations[lang] || translations.en;
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return initialRoutineData;
-      const parsed = JSON.parse(saved);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [appData]);
+
+  const showNotice = (msg) => {
+    setStatusMessage(msg);
+    setTimeout(() => {
+      setStatusMessage("");
+    }, 3000);
+  };
+
+  const handleLanguageChange = (nextLang) => {
+    setAppData((prev) => ({
+      ...prev,
+      language: nextLang,
+    }));
+  };
+
+  const handleSaveSchedule = (newSchedule) => {
+    setAppData((prev) => ({
+      ...prev,
+      schedule: {
+        ...prev.schedule,
+        ...newSchedule,
+      },
+      tasks: generateTasksFromSchedule(prev.tasks, {
+        ...prev.schedule,
+        ...newSchedule,
+      }),
+    }));
+    showNotice(t.noticeScheduleSaved);
+  };
+
+  const handleToggleBusyMode = () => {
+    setAppData((prev) => {
+      const nextBusy = !prev.schedule.busyMode;
+      showNotice(nextBusy ? t.noticeBusyOn : t.noticeBusyOff);
       return {
-        ...initialRoutineData,
-        ...parsed,
+        ...prev,
         schedule: {
-          ...initialRoutineData.schedule,
-          ...(parsed.schedule || {}),
+          ...prev.schedule,
+          busyMode: nextBusy,
         },
-        tasks:
-          Array.isArray(parsed.tasks) && parsed.tasks.length > 0
-            ? parsed.tasks
-            : initialRoutineData.tasks,
-        weeklyHistory:
-          Array.isArray(parsed.weeklyHistory) && parsed.weeklyHistory.length > 0
-            ? parsed.weeklyHistory
-            : initialRoutineData.weeklyHistory,
       };
-    } catch {
-      return initialRoutineData;
-    }
-  });
-
-  const [activeTab, setActiveTab] = useState("today"); // "today" | "setup" | "weekly"
-  const todayStr = getTodayDateString();
-
-  // Save full routine state to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(routineData));
-    } catch {
-      // Ignore storage quota or private mode errors
-    }
-  }, [routineData]);
-
-  // Automatically sync today's task completion into weeklyHistory whenever tasks change
-  useEffect(() => {
-    const todaySummary = buildTodaySummary(routineData.tasks, todayStr);
-    setRoutineData((prev) => {
-      const nextHistory = upsertWeeklyHistory(prev.weeklyHistory, todaySummary);
-      const isUnchanged =
-        JSON.stringify(prev.weeklyHistory) === JSON.stringify(nextHistory);
-      return isUnchanged ? prev : { ...prev, weeklyHistory: nextHistory };
     });
-  }, [routineData.tasks, todayStr]);
+  };
 
-  const updateTask = (taskId) => {
-    setRoutineData((prev) => ({
+  const handleToggleTask = (taskId) => {
+    setAppData((prev) => ({
       ...prev,
       tasks: prev.tasks.map((task) =>
         task.id === taskId ? { ...task, completed: !task.completed } : task
@@ -130,219 +104,295 @@ export default function App() {
     }));
   };
 
-  const toggleBusyMode = () => {
-    setRoutineData((prev) => ({
-      ...prev,
-      schedule: {
-        ...prev.schedule,
-        busyMode: !prev.schedule.busyMode,
-      },
-    }));
+  const handleResetRoutine = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setAppData(initialRoutineData);
+    showNotice(translations.en.noticeReset);
   };
 
-  const handleSaveSchedule = (newScheduleValues) => {
-    setRoutineData((prev) => {
-      const updatedSchedule = {
-        ...prev.schedule,
-        ...newScheduleValues,
-      };
-      return {
-        ...prev,
-        schedule: updatedSchedule,
-        tasks: generateTasksFromSchedule(prev.tasks, updatedSchedule),
-      };
-    });
-    setActiveTab("today");
-  };
-
-  const syncTodayToWeeklyHistory = () => {
-    const todaySummary = buildTodaySummary(routineData.tasks, todayStr);
-    setRoutineData((prev) => ({
-      ...prev,
-      weeklyHistory: upsertWeeklyHistory(prev.weeklyHistory, todaySummary),
-    }));
-    setActiveTab("weekly");
-  };
-
-  const resetDay = () => {
-    setRoutineData((prev) => ({
-      ...prev,
-      tasks: prev.tasks.map((task) => ({ ...task, completed: false })),
-    }));
-  };
-
-  const completedCount = routineData.tasks.reduce(
-    (acc, item) => acc + (item.completed ? 1 : 0),
+  const completedCount = appData.tasks.filter((task) => task.completed).length;
+  const totalCount = appData.tasks.length;
+  const totalMinutes = appData.tasks.reduce(
+    (sum, task) =>
+      sum + (appData.schedule.busyMode ? task.busyDurationMins : task.durationMins),
     0
   );
-  const totalCount = routineData.tasks.length;
-
-  const tabBtnStyle = (isActive) => ({
-    padding: "10px 16px",
-    border: "1px solid #0f172a",
-    borderRadius: "0",
-    backgroundColor: isActive ? "#0f172a" : "#ffffff",
-    color: isActive ? "#ffffff" : "#0f172a",
-    fontWeight: 700,
-    fontSize: "14px",
-    cursor: "pointer",
-  });
-
-  const actionBtnStyle = {
-    padding: "10px 14px",
-    border: "1px solid #0f172a",
-    borderRadius: "0",
-    backgroundColor: "#ffffff",
-    color: "#0f172a",
-    fontWeight: 600,
-    fontSize: "13px",
-    cursor: "pointer",
-  };
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "#f1f5f9",
-        padding: "24px 16px",
+        backgroundColor: "#eef2ff",
+        color: "#0f172a",
+        fontFamily:
+          "'Segoe UI', 'Noto Sans Gujarati', 'Noto Sans Devanagari', system-ui, sans-serif",
         boxSizing: "border-box",
-        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       }}
     >
-      <div
+      {/* Vibrant Colorful Top Header */}
+      <header
         style={{
-          width: "min(92%, 960px)",
-          margin: "0 auto",
+          background: "linear-gradient(120deg, #1d4ed8 0%, #4338ca 55%, #0f766e 100%)",
+          color: "#ffffff",
+          borderBottom: "3px solid #0f172a",
         }}
       >
-        <header
+        <div
           style={{
-            border: "1px solid #0f172a",
-            backgroundColor: "#ffffff",
-            padding: "20px",
-            borderRadius: "0",
-            marginBottom: "16px",
+            maxWidth: "1140px",
+            margin: "0 auto",
+            padding: "clamp(16px, 2.5vw, 26px) clamp(14px, 3vw, 28px)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "18px",
+          }}
+        >
+          <div style={{ maxWidth: "680px" }}>
+            <div
+              style={{
+                display: "inline-block",
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                padding: "4px 10px",
+                border: "1px solid rgba(255,255,255,0.45)",
+                backgroundColor: "rgba(15, 23, 42, 0.35)",
+                color: "#fef08a",
+                borderRadius: "0",
+                marginBottom: "10px",
+              }}
+            >
+              {t.badge}
+            </div>
+
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "clamp(22px, 3.2vw, 32px)",
+                lineHeight: 1.2,
+                fontWeight: 700,
+                color: "#ffffff",
+              }}
+            >
+              {t.heroTitle}
+            </h1>
+
+            <p
+              style={{
+                margin: "8px 0 0",
+                fontSize: "clamp(13px, 1.6vw, 15px)",
+                lineHeight: 1.55,
+                color: "#e0e7ff",
+              }}
+            >
+              {t.heroSubtitle}
+            </p>
+          </div>
+
+          {/* Language Switcher + Time Stat + Reset */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                border: "1px solid #ffffff",
+                backgroundColor: "#0f172a",
+                borderRadius: "0",
+                padding: "4px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "#93c5fd",
+                  padding: "0 8px",
+                }}
+              >
+                {t.languageLabel}:
+              </span>
+              {[
+                { code: "en", label: "English" },
+                { code: "gu", label: "ગુજરાતી" },
+                { code: "hi", label: "हिन्दी" },
+              ].map((item) => {
+                const active = lang === item.code;
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => handleLanguageChange(item.code)}
+                    style={{
+                      padding: "6px 10px",
+                      border: "none",
+                      borderRadius: "0",
+                      backgroundColor: active ? "#f59e0b" : "transparent",
+                      color: active ? "#0f172a" : "#ffffff",
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                padding: "9px 14px",
+                border: "1px solid #99f6e4",
+                backgroundColor: "#115e59",
+                borderRadius: "0",
+                minWidth: "125px",
+              }}
+            >
+              <div style={{ fontSize: "11px", color: "#ccfbf1" }}>
+                {t.totalRoutineTime}
+              </div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#ffffff" }}>
+                {totalMinutes} {t.mins}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleResetRoutine}
+              style={{
+                padding: "11px 14px",
+                border: "1px solid #ffffff",
+                backgroundColor: "#be123c",
+                color: "#ffffff",
+                borderRadius: "0",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {t.resetDefault}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Status Toast */}
+      {statusMessage && (
+        <div
+          style={{
+            maxWidth: "1140px",
+            margin: "14px auto 0",
+            padding: "0 clamp(14px, 3vw, 28px)",
+            boxSizing: "border-box",
           }}
         >
           <div
             style={{
-              display: "flex",
-              flexWrap: "wrap",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              gap: "8px",
+              padding: "10px 14px",
+              border: "1px solid #047857",
+              borderLeft: "5px solid #10b981",
+              backgroundColor: "#ecfdf5",
+              color: "#064e3b",
+              fontSize: "13px",
+              fontWeight: 700,
+              borderRadius: "0",
             }}
           >
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "clamp(22px, 3vw, 30px)",
-                color: "#0f172a",
-              }}
-            >
-              RoutineFlow
-            </h1>
-            <span style={{ fontSize: "13px", color: "#475569", fontWeight: 600 }}>
-              તારીખ: {todayStr}
-            </span>
+            {statusMessage}
           </div>
+        </div>
+      )}
 
-          <p
-            style={{
-              margin: "6px 0 16px",
-              fontSize: "14px",
-              color: "#334155",
-            }}
-          >
-            વ્યસ્ત સમયપત્રક માટે સ્માર્ટ હેલ્થ અને રૂટિન પ્લાનર — ૧૫-મિનિટ રૂટિન, બિઝી ડે મોડ, મીલ ગાઈડ અને સાપ્તાહિક ટ્રેકર.
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "10px",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              <button
-                type="button"
-                style={tabBtnStyle(activeTab === "today")}
-                onClick={() => setActiveTab("today")}
-              >
-                આજનું રૂટિન (Today)
-              </button>
-              <button
-                type="button"
-                style={tabBtnStyle(activeTab === "setup")}
-                onClick={() => setActiveTab("setup")}
-              >
-                શેડ્યૂલ સેટઅપ
-              </button>
-              <button
-                type="button"
-                style={tabBtnStyle(activeTab === "weekly")}
-                onClick={() => setActiveTab("weekly")}
-              >
-                સાપ્તાહિક સારાંશ
-              </button>
-            </div>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              <button
-                type="button"
-                style={actionBtnStyle}
-                onClick={syncTodayToWeeklyHistory}
-              >
-                Weekly લોગ સેવ કરો
-              </button>
-              <button
-                type="button"
-                style={actionBtnStyle}
-                onClick={resetDay}
-              >
-                આજનો દિવસ રીસેટ કરો
-              </button>
-            </div>
-          </div>
-        </header>
-
+      {/* Responsive Main Grid */}
+      <main
+        style={{
+          maxWidth: "1140px",
+          margin: "0 auto",
+          padding: "clamp(16px, 2.5vw, 28px) clamp(14px, 3vw, 28px) 36px",
+          boxSizing: "border-box",
+        }}
+      >
         <BusyModeBar
-          busyMode={routineData.schedule.busyMode}
-          onToggleBusyMode={toggleBusyMode}
+          busyMode={appData.schedule.busyMode}
+          onToggleBusyMode={handleToggleBusyMode}
           completedCount={completedCount}
           totalCount={totalCount}
+          t={t}
         />
 
-        {activeTab === "setup" && (
-          <ScheduleSetupForm
-            workStart={routineData.schedule.workStart}
-            workEnd={routineData.schedule.workEnd}
-            goal={routineData.schedule.goal}
-            onSaveSchedule={handleSaveSchedule}
-          />
-        )}
-
-        {activeTab === "today" && (
-          <>
-            <RoutineSlotList
-              slots={routineData.tasks}
-              busyMode={routineData.schedule.busyMode}
-              onToggleTask={updateTask}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "20px",
+            alignItems: "start",
+          }}
+        >
+          <div>
+            <ScheduleSetupForm
+              workStart={appData.schedule.workStart}
+              workEnd={appData.schedule.workEnd}
+              morningMeal={appData.schedule.morningMeal}
+              afternoonSnack={appData.schedule.afternoonSnack}
+              dinner={appData.schedule.dinner}
+              goal={appData.schedule.goal}
+              onSaveSchedule={handleSaveSchedule}
+              t={t}
             />
-            <MealGuideCard
-              mealRules={mealRulesData}
-              schedule={routineData.schedule}
-            />cd C:\Users\Jaypal\Desktop\RoutineFlow\routine-planner
-          </>
-        )}
+            <MealGuideCard schedule={appData.schedule} t={t} />
+          </div>
 
-        {activeTab === "weekly" && (
-          <WeeklySummaryView weeklyHistory={routineData.weeklyHistory} />
-        )}
-      </div>
+          <div>
+            <RoutineSlotList
+              slots={appData.tasks}
+              busyMode={appData.schedule.busyMode}
+              onToggleTask={handleToggleTask}
+              t={t}
+            />
+            <WeeklySummaryView weeklyHistory={appData.weeklyHistory} t={t} />
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer
+        style={{
+          borderTop: "2px solid #c7d2fe",
+          backgroundColor: "#ffffff",
+          padding: "16px clamp(14px, 3vw, 28px)",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "1140px",
+            margin: "0 auto",
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "10px",
+            fontSize: "12px",
+            color: "#334155",
+          }}
+        >
+          <span>
+            <strong>{t.footerLeft}</strong>
+          </span>
+          <span>
+            {t.footerRightPrefix} <code>{STORAGE_KEY}</code>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

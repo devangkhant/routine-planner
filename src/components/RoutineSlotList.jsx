@@ -1,13 +1,28 @@
 import React from "react";
 
-export default function RoutineSlotList({ slots, busyMode, onToggleTask }) {
+export default function RoutineSlotList({ slots, busyMode, onToggleTask, t }) {
   const safeSlots = Array.isArray(slots) ? slots : [];
   const slotNames = ["Morning", "Work Break", "Evening / Night"];
 
-  const slotLabelMap = {
-    Morning: "સવારનું રૂટિન (Morning)",
-    "Work Break": "કામના બ્રેક દરમિયાન (Work Break)",
-    "Evening / Night": "સાંજ / રાતનું રૂટિન (Evening / Night)",
+  const slotConfig = {
+    Morning: {
+      label: t.slotMorning,
+      accent: "#d97706",
+      headerBg: "#fffbeb",
+      badgeBg: "#fef3c7",
+    },
+    "Work Break": {
+      label: t.slotBreak,
+      accent: "#0284c7",
+      headerBg: "#f0f9ff",
+      badgeBg: "#e0f2fe",
+    },
+    "Evening / Night": {
+      label: t.slotEvening,
+      accent: "#7c3aed",
+      headerBg: "#f5f3ff",
+      badgeBg: "#ede9fe",
+    },
   };
 
   return (
@@ -16,10 +31,11 @@ export default function RoutineSlotList({ slots, busyMode, onToggleTask }) {
         display: "flex",
         flexDirection: "column",
         gap: "16px",
-        marginBottom: "18px",
+        marginBottom: "20px",
       }}
     >
       {slotNames.map((slotName) => {
+        const cfg = slotConfig[slotName];
         const slotTasks = safeSlots.filter((task) => task.slot === slotName);
         const completedInSlot = slotTasks.reduce(
           (acc, item) => acc + (item.completed ? 1 : 0),
@@ -31,22 +47,27 @@ export default function RoutineSlotList({ slots, busyMode, onToggleTask }) {
             : 0;
 
         return (
-          <div
+          <section
             key={slotName}
             style={{
               border: "1px solid #0f172a",
+              borderLeft: `5px solid ${cfg.accent}`,
               backgroundColor: "#ffffff",
-              padding: "16px",
+              padding: "clamp(14px, 2vw, 18px)",
               borderRadius: "0",
+              boxSizing: "border-box",
             }}
           >
             <div
               style={{
                 display: "flex",
+                flexWrap: "wrap",
                 justifyContent: "space-between",
                 alignItems: "center",
-                borderBottom: "1px solid #cbd5e1",
-                paddingBottom: "8px",
+                gap: "8px",
+                backgroundColor: cfg.headerBg,
+                border: "1px solid #e2e8f0",
+                padding: "8px 12px",
                 marginBottom: "12px",
               }}
             >
@@ -57,13 +78,17 @@ export default function RoutineSlotList({ slots, busyMode, onToggleTask }) {
                   color: "#0f172a",
                 }}
               >
-                {slotLabelMap[slotName]}
+                {cfg.label}
               </h3>
               <span
                 style={{
-                  fontSize: "13px",
+                  fontSize: "12px",
                   fontWeight: 700,
+                  padding: "3px 8px",
+                  backgroundColor: cfg.badgeBg,
+                  border: "1px solid #cbd5e1",
                   color: "#0f172a",
+                  borderRadius: "0",
                 }}
               >
                 {completedInSlot}/{slotTasks.length} ({slotPercent}%)
@@ -72,7 +97,10 @@ export default function RoutineSlotList({ slots, busyMode, onToggleTask }) {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {slotTasks.map((task) => {
-                const displayTitle = busyMode ? task.busyTitle : task.title;
+                const localized = t.taskText?.[task.id];
+                const displayTitle = busyMode
+                  ? localized?.busyTitle || task.busyTitle
+                  : localized?.title || task.title;
                 const displayMins = busyMode
                   ? task.busyDurationMins
                   : task.durationMins;
@@ -87,7 +115,7 @@ export default function RoutineSlotList({ slots, busyMode, onToggleTask }) {
                       gap: "12px",
                       padding: "10px 12px",
                       border: "1px solid #cbd5e1",
-                      backgroundColor: task.completed ? "#f1f5f9" : "#ffffff",
+                      backgroundColor: task.completed ? "#ecfdf5" : "#ffffff",
                       borderRadius: "0",
                       cursor: "pointer",
                     }}
@@ -123,19 +151,19 @@ export default function RoutineSlotList({ slots, busyMode, onToggleTask }) {
                         fontWeight: 700,
                         padding: "4px 8px",
                         border: "1px solid #0f172a",
-                        backgroundColor: busyMode ? "#fef3c7" : "#f8fafc",
+                        backgroundColor: busyMode ? "#fef3c7" : "#f1f5f9",
                         color: "#0f172a",
                         borderRadius: "0",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {displayMins} મિનિટ
+                      {displayMins} {t.mins}
                     </span>
                   </label>
                 );
               })}
             </div>
-          </div>
+          </section>
         );
       })}
     </div>

@@ -3,26 +3,33 @@ import React, { useState, useEffect } from "react";
 export default function ScheduleSetupForm({
   workStart,
   workEnd,
+  morningMeal,
+  afternoonSnack,
+  dinner,
   goal,
   onSaveSchedule,
+  t,
 }) {
   const [formData, setFormData] = useState({
     workStart: workStart || "10:00",
     workEnd: workEnd || "20:30",
-    morningMeal: "08:45",
-    afternoonSnack: "15:00",
-    dinner: "21:00",
+    morningMeal: morningMeal || "08:45",
+    afternoonSnack: afternoonSnack || "15:00",
+    dinner: dinner || "21:00",
     goal: goal || "bellyFat",
   });
 
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      workStart: workStart || prev.workStart,
-      workEnd: workEnd || prev.workEnd,
-      goal: goal || prev.goal,
+      workStart: workStart ?? prev.workStart,
+      workEnd: workEnd ?? prev.workEnd,
+      morningMeal: morningMeal ?? prev.morningMeal,
+      afternoonSnack: afternoonSnack ?? prev.afternoonSnack,
+      dinner: dinner ?? prev.dinner,
+      goal: goal ?? prev.goal,
     }));
-  }, [workStart, workEnd, goal]);
+  }, [workStart, workEnd, morningMeal, afternoonSnack, dinner, goal]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,15 +43,17 @@ export default function ScheduleSetupForm({
 
   const cardStyle = {
     border: "1px solid #0f172a",
+    borderTop: "4px solid #4f46e5",
     backgroundColor: "#ffffff",
-    padding: "18px",
+    padding: "clamp(16px, 2vw, 20px)",
     borderRadius: "0",
-    marginBottom: "18px",
+    marginBottom: "20px",
+    boxSizing: "border-box",
   };
 
   const gridStyle = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))",
     gap: "12px",
     marginTop: "14px",
   };
@@ -54,25 +63,31 @@ export default function ScheduleSetupForm({
     padding: "8px 10px",
     border: "1px solid #64748b",
     borderRadius: "0",
-    fontSize: "14px",
+    fontSize: "13px",
     marginTop: "6px",
     boxSizing: "border-box",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8fafc",
     color: "#0f172a",
   };
 
   return (
     <form onSubmit={handleSubmit} style={cardStyle}>
-      <h2 style={{ margin: 0, fontSize: "clamp(17px, 2vw, 20px)", color: "#0f172a" }}>
-        શેડ્યૂલ અને લક્ષ્ય સેટઅપ
+      <h2
+        style={{
+          margin: 0,
+          fontSize: "clamp(17px, 2vw, 20px)",
+          color: "#1e1b4b",
+        }}
+      >
+        {t.setupTitle}
       </h2>
       <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#475569" }}>
-        તમારો કામનો સમય, ભોજન/નાસ્તાનો સમય અને મુખ્ય લક્ષ્ય પસંદ કરીને આજનું રૂટિન જનરેટ કરો.
+        {t.setupSubtitle}
       </p>
 
       <div style={gridStyle}>
-        <label style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b" }}>
-          કામ શરૂ થવાનો સમય
+        <label style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b" }}>
+          {t.workStartLabel}
           <input
             type="time"
             name="workStart"
@@ -82,8 +97,8 @@ export default function ScheduleSetupForm({
           />
         </label>
 
-        <label style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b" }}>
-          કામ પૂરું થવાનો સમય
+        <label style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b" }}>
+          {t.workEndLabel}
           <input
             type="time"
             name="workEnd"
@@ -93,8 +108,8 @@ export default function ScheduleSetupForm({
           />
         </label>
 
-        <label style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b" }}>
-          સવારનો નાસ્તો / ભોજન
+        <label style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b" }}>
+          {t.morningMealLabel}
           <input
             type="time"
             name="morningMeal"
@@ -104,8 +119,8 @@ export default function ScheduleSetupForm({
           />
         </label>
 
-        <label style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b" }}>
-          બપોરનો નાસ્તો
+        <label style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b" }}>
+          {t.afternoonSnackLabel}
           <input
             type="time"
             name="afternoonSnack"
@@ -115,8 +130,8 @@ export default function ScheduleSetupForm({
           />
         </label>
 
-        <label style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b" }}>
-          રાત્રિનું ભોજન (Dinner)
+        <label style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b" }}>
+          {t.dinnerLabel}
           <input
             type="time"
             name="dinner"
@@ -126,17 +141,17 @@ export default function ScheduleSetupForm({
           />
         </label>
 
-        <label style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b" }}>
-          મુખ્ય લક્ષ્ય (Goal)
+        <label style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b" }}>
+          {t.goalLabel}
           <select
             name="goal"
             value={formData.goal}
             onChange={handleChange}
             style={inputStyle}
           >
-            <option value="bellyFat">કમર / પેટની ચરબી ઘટાડવી (bellyFat)</option>
-            <option value="energy">દિવસભર એનર્જી વધારવી (energy)</option>
-            <option value="deskFatigue">બેઠાડુ કામનો થાક ઘટાડવો (deskFatigue)</option>
+            <option value="bellyFat">{t.goalBellyFat}</option>
+            <option value="energy">{t.goalEnergy}</option>
+            <option value="deskFatigue">{t.goalDeskFatigue}</option>
           </select>
         </label>
       </div>
@@ -146,16 +161,16 @@ export default function ScheduleSetupForm({
           type="submit"
           style={{
             padding: "10px 18px",
-            backgroundColor: "#0f172a",
+            backgroundColor: "#0d9488",
             color: "#ffffff",
             border: "1px solid #0f172a",
             borderRadius: "0",
             fontWeight: 700,
-            fontSize: "14px",
+            fontSize: "13px",
             cursor: "pointer",
           }}
         >
-          રૂટિન જનરેટ / સેવ કરો
+          {t.saveRoutineBtn}
         </button>
       </div>
     </form>
