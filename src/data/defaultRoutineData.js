@@ -122,6 +122,8 @@ export const translations = {
     weeklyTitle: "Weekly Summary",
     weeklySubtitlePrefix: "Last",
     weeklySubtitleSuffix: "days completion, consistency, and missed slots.",
+    logTodayBtn: "Log Today to Weekly History",
+    noticeLoggedToday: "Today's progress has been saved to Weekly Summary.",
     avgCompletionLabel: "Avg Completion",
     consistentDaysLabel: "Consistent Days (≥75%)",
     topMissedLabel: "Most Missed Slot",
@@ -236,6 +238,8 @@ export const translations = {
     weeklyTitle: "સાપ્તાહિક સારાંશ",
     weeklySubtitlePrefix: "છેલ્લા",
     weeklySubtitleSuffix: "દિવસની પૂર્ણતા, સાતત્ય અને ચૂકાયેલા સ્લોટ્સ.",
+    logTodayBtn: "આજની પ્રગતિ Weekly Summary માં સેવ કરો",
+    noticeLoggedToday: "આજની રૂટિન પ્રગતિ સાપ્તાહિક સારાંશમાં સેવ થઈ ગઈ છે.",
     avgCompletionLabel: "સરેરાશ પૂર્ણતા",
     consistentDaysLabel: "સતત દિવસો (≥75%)",
     topMissedLabel: "સૌથી વધુ ચૂકાયેલો સ્લોટ",
@@ -350,6 +354,8 @@ export const translations = {
     weeklyTitle: "साप्ताहिक सारांश",
     weeklySubtitlePrefix: "पिछले",
     weeklySubtitleSuffix: "दिनों की पूर्णता, निरंतरता और छूटे हुए स्लॉट्स.",
+    logTodayBtn: "आज की प्रगति Weekly Summary में सेव करें",
+    noticeLoggedToday: "आज की रूटीन प्रगति साप्ताहिक सारांश में सेव हो गई है.",
     avgCompletionLabel: "औसत पूर्णता",
     consistentDaysLabel: "निरंतर दिन (≥75%)",
     topMissedLabel: "सबसे अधिक छूटा स्लॉट",
@@ -422,7 +428,7 @@ export const translations = {
   },
 };
 
-export function generateTasksFromSchedule(prevTasks, newSchedule) {
+export function generateTasksFromSchedule(prevTasks) {
   return prevTasks.map((task) => ({
     ...task,
     completed: false,
